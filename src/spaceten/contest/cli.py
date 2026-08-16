@@ -1,11 +1,20 @@
 import hashlib
+import json
 import sys
+import tempfile
 from pathlib import Path
 from typing import NoReturn
 
 import typer
 
 from spaceten.contest.anagrams import DEFAULT_ENERGY, FIXTURE_ID, NAMES_MD, RULES_MD
+from spaceten.contest.leaderboard import (
+    rank,
+    render_markdown,
+    render_text,
+    scan_packs,
+    score_pack,
+)
 from spaceten.contest.pack import pack_world
 from spaceten.contest.verify import verify_root
 from spaceten.kernel.event import Act, Finish
@@ -171,3 +180,50 @@ def contest_pack(
         f"energy_spent_mj={report.spent_mj} events={report.events} "
         f"step_bytes={report.step_bytes}"
     )
+
+
+@contest_app.command("leaderboard")
+def contest_leaderboard(
+    directory: Path = typer.Argument(
+        Path("."),
+        help="Directory of *.sten.tgz packs.",
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Emit JSON rows."),
+    write: Path | None = typer.Option(
+        None,
+        "--write",
+        help="Write a markdown table to this path.",
+    ),
+) -> None:
+    """Rank verified contest packs. Does not need a world in --root."""
+    folder = directory.expanduser().resolve()
+    if not folder.is_dir():
+        _fail(f"not a directory: {folder}")
+    packs = scan_packs(folder)
+    if not packs:
+        _fail(f"no *.sten.tgz packs in {folder}")
+    with tempfile.TemporaryDirectory(prefix="sten-board-") as tmp:
+        rows = rank([score_pack(pack, Path(tmp)) for pack in packs])
+    if as_json:
+        typer.echo(
+            json.dumps(
+                [
+                    {
+                        "name": r.name,
+                        "division": r.division,
+                        "ok": r.ok,
+                        "energy_spent_mj": r.spent_mj,
+                        "events": r.events,
+                        "step_bytes": r.step_bytes,
+                        "issues": list(r.issues),
+                    }
+                    for r in rows
+                ],
+                indent=2,
+            )
+        )
+    else:
+        typer.echo(render_text(rows), nl=False)
+    if write is not None:
+        write.write_text(render_markdown(rows), encoding="utf-8")
+        typer.echo(f"wrote {write}")

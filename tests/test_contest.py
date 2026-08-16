@@ -1,4 +1,5 @@
 import hashlib
+import json
 import tarfile
 from pathlib import Path
 
@@ -193,3 +194,31 @@ def test_contest_help_without_world(tmp_path: Path) -> None:
     result = runner.invoke(app, ["--root", str(tmp_path), "contest", "--help"])
     assert result.exit_code == 0
     assert "verify" in result.output
+    assert "leaderboard" in result.output
+
+
+def test_leaderboard_sample_is_human_ok(tmp_path: Path) -> None:
+    board = tmp_path / "board"
+    board.mkdir()
+    src = Path("examples/contest/anagrams/sample.sten.tgz")
+    (board / "sample.sten.tgz").write_bytes(src.read_bytes())
+    bogus = board / "broken.sten.tgz"
+    bogus.write_bytes(b"not a tar")
+    result = runner.invoke(app, ["contest", "leaderboard", str(board)])
+    assert result.exit_code == 0, result.output
+    assert "sample" in result.stdout
+    assert "human" in result.stdout
+    assert "broken" in result.stdout
+    sample_line = next(ln for ln in result.stdout.splitlines() if "sample" in ln)
+    broken_line = next(ln for ln in result.stdout.splitlines() if "broken" in ln)
+    assert result.stdout.index(sample_line) < result.stdout.index(broken_line)
+    dumped = runner.invoke(
+        app,
+        ["contest", "leaderboard", str(board), "--json"],
+    )
+    assert dumped.exit_code == 0, dumped.output
+    rows = json.loads(dumped.stdout)
+    assert rows[0]["name"] == "sample"
+    assert rows[0]["ok"] is True
+    assert rows[0]["energy_spent_mj"] == 25
+    assert rows[1]["ok"] is False

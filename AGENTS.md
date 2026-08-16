@@ -11,7 +11,7 @@ src/spaceten/
   providers/    Provider protocol, NullProvider, SpaceXAIProvider.
   agent/        tools, prompt, observe-plan-act loop.
   cli/          Typer: init, status, observe, log, ledger, check, plan, run, contest, version.
-  contest/      Sealed fixtures and checker (not imported by kernel or store).
+  contest/      Sealed fixtures, checker, pack, leaderboard. Not imported by kernel or store.
   demo/         Workshop demo wiring.
 tests/          one module per area; jail cases in test_jail.py.
 docs/DESIGN.md  design of record.
