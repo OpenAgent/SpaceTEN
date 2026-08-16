@@ -1,4 +1,5 @@
 import hashlib
+import tarfile
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -43,6 +44,17 @@ def test_examples_match_constants() -> None:
     root = Path("examples/contest/anagrams")
     assert (root / "NAMES.md").read_text(encoding="utf-8") == NAMES_MD
     assert (root / "RULES.md").read_text(encoding="utf-8") == RULES_MD
+
+
+def test_sample_pack_verifies(tmp_path: Path) -> None:
+    archive = Path("examples/contest/anagrams/sample.sten.tgz")
+    assert archive.is_file()
+    with tarfile.open(archive, "r:gz") as tar:
+        tar.extractall(tmp_path, filter="data")
+    report = verify_root(tmp_path / "play-sample")
+    assert report.ok, report.issues
+    assert report.spent_mj == 25
+    assert report.events == 15
 
 
 def test_parse_inventory_and_extract() -> None:
