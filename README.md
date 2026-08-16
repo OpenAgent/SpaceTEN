@@ -33,10 +33,11 @@ uv run spaceten check
 
 **This sends tool results — including file contents the agent just read — to `api.x.ai`.** Do not point it at secrets you would not paste into a third-party API. The kernel and store never import the adapter. Default provider stays `null` so a clone cannot surprise-bill.
 
+Same directory as the Null block (`examples/workshop` after `init`):
+
 ```bash
 export XAI_API_KEY=...
-uv run spaceten --root ./examples/workshop run \
-  --goal "Summarize IN.txt into OUT.md" --provider spacexai
+uv run spaceten run --goal "Summarize IN.txt into OUT.md" --provider spacexai
 ```
 
 ## Jail and threats
