@@ -8,6 +8,9 @@ from typing import NoReturn
 import typer
 
 from spaceten import __version__
+from spaceten.agent.loop import RunConfig
+from spaceten.agent.loop import plan as plan_loop
+from spaceten.agent.loop import run as run_loop
 from spaceten.cli.render import (
     render_check,
     render_event,
@@ -34,6 +37,8 @@ from spaceten.kernel.space import (
     WriteTooLarge,
 )
 from spaceten.kernel.world import CheckIssue, CheckReport, World
+from spaceten.providers.base import Provider
+from spaceten.providers.null import NullProvider
 from spaceten.store.jsonl import JsonlStore
 from spaceten.store.protocol import WorldHeader
 
@@ -141,6 +146,37 @@ def _cli_error(exc: BaseException) -> NoReturn:
     if isinstance(exc, TruncatedLog):
         _fail(f"{exc}; pass check --truncate-partial")
     _fail(str(exc))
+
+
+def _make_provider(name: str) -> Provider:
+    key = name.strip().casefold()
+    if key == "null":
+        return NullProvider()
+    if key == "spacexai":
+        try:
+            from spaceten.providers.spacexai import (  # pyright: ignore[reportMissingImports]
+                SpaceXAIProvider,
+            )
+        except ImportError:
+            _fail("spacexai provider is not available; pass --provider null")
+        return SpaceXAIProvider()
+    _fail(f"unknown provider {name!r}; use null or spacexai")
+
+
+_WORLD_ERRORS = (
+    WorldLocked,
+    TruncatedLog,
+    DirtySpace,
+    OutsideSpace,
+    CellNotFound,
+    EnergyExhausted,
+    InvariantError,
+    WriteTooLarge,
+    FileNotFoundError,
+    NotADirectoryError,
+    IsADirectoryError,
+    ValueError,
+)
 
 
 def _dirty_space_issues(root: Path, events: Sequence[Event]) -> list[CheckIssue]:
@@ -379,4 +415,72 @@ def check(
         _cli_error(exc)
     typer.echo(render_check(report))
     if not report.ok:
+        raise typer.Exit(1)
+
+
+@app.command()
+def plan(
+    ctx: typer.Context,
+    goal: str = typer.Option(..., "--goal", help="What to plan."),
+    provider: str = typer.Option(
+        "null",
+        "--provider",
+        envvar="SPACETEN_PROVIDER",
+        help="Planner: null (default) or spacexai.",
+    ),
+) -> None:
+    """One provider completion, commit Plan, do not act."""
+    root = _opts(ctx).root
+    _require_world(root)
+    try:
+        world = World.load(root)
+        result = plan_loop(world, _make_provider(provider), RunConfig(goal=goal))
+    except _WORLD_ERRORS as exc:
+        _cli_error(exc)
+    if world.head is not None:
+        typer.echo(
+            f"{render_event(world.head)} remaining={world.account.remaining.mj} mj"
+        )
+    if result.reason != "finished":
+        raise typer.Exit(1)
+
+
+@app.command()
+def run(
+    ctx: typer.Context,
+    goal: str = typer.Option(..., "--goal", help="What to accomplish."),
+    provider: str = typer.Option(
+        "null",
+        "--provider",
+        envvar="SPACETEN_PROVIDER",
+        help="Planner: null (default) or spacexai. SpaceXAI is opt-in.",
+    ),
+    max_steps: int = typer.Option(
+        32,
+        "--max-steps",
+        envvar="SPACETEN_MAX_STEPS",
+        min=1,
+        help="Maximum plan/act steps.",
+    ),
+) -> None:
+    """Run the observe-plan-act loop until Finish or Failed."""
+    root = _opts(ctx).root
+    _require_world(root)
+    try:
+        world = World.load(root)
+        result = run_loop(
+            world,
+            _make_provider(provider),
+            RunConfig(goal=goal, max_steps=max_steps),
+        )
+        _header, events, account, _cells = _snapshot(root)
+    except _WORLD_ERRORS as exc:
+        _cli_error(exc)
+    parts = [result.reason]
+    if result.artifact is not None:
+        parts.append(f"artifact={result.artifact}")
+    parts.append(f"remaining={account.remaining.mj} mj")
+    typer.echo(" ".join(parts))
+    typer.echo(render_ledger(events, account))
+    if result.reason != "finished":
         raise typer.Exit(1)
