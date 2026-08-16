@@ -18,3 +18,5 @@ uv run spaceten --root . contest pack
 ```
 
 Human and agent divisions are separate boards. Default provider stays `null`.
+
+A solved human run (spoilers) is in [SAMPLE.md](SAMPLE.md).
