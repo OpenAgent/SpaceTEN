@@ -60,8 +60,10 @@ uv run spaceten contest init ./play --fixture anagrams
 uv run spaceten --root ./play observe NAMES.md
 # commit steps/*.md then SOLUTION.md via spaceten contest step
 uv run spaceten --root ./play contest verify
+uv run spaceten contest leaderboard examples/contest/anagrams
 ```
 
-See [examples/contest/anagrams/README.md](examples/contest/anagrams/README.md).
+See [examples/contest/anagrams/README.md](examples/contest/anagrams/README.md)
+and [examples/contest/anagrams/LEADERBOARD.md](examples/contest/anagrams/LEADERBOARD.md).
 
 The design of record is [docs/DESIGN.md](docs/DESIGN.md).

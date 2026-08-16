@@ -20,3 +20,12 @@ uv run spaceten --root . contest pack
 Human and agent divisions are separate boards. Default provider stays `null`.
 
 A solved human run (spoilers) is in [SAMPLE.md](SAMPLE.md).
+
+Rank packs in this directory (or any folder of `*.sten.tgz`):
+
+```bash
+uv run spaceten contest leaderboard examples/contest/anagrams
+uv run spaceten contest leaderboard examples/contest/anagrams --write examples/contest/anagrams/LEADERBOARD.md
+```
+
+See [LEADERBOARD.md](LEADERBOARD.md).

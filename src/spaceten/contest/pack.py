@@ -9,6 +9,16 @@ def pack_world(root: Path, dest: Path) -> Path:
     return dest
 
 
+def unpack_world(archive: Path, dest: Path) -> Path:
+    dest.mkdir(parents=True, exist_ok=True)
+    with tarfile.open(archive, "r:gz") as tar:
+        tar.extractall(dest, filter="data")
+    worlds = sorted(p.parent for p in dest.rglob(".spaceten") if p.is_dir())
+    if not worlds:
+        raise ValueError(f"no SpaceTEN world in {archive}")
+    return worlds[0]
+
+
 def _skip_junk(info: tarfile.TarInfo) -> tarfile.TarInfo | None:
     name = info.name.replace("\\", "/")
     parts = name.split("/")
