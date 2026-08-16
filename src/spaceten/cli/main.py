@@ -1,3 +1,4 @@
+import hashlib
 import logging
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -22,7 +23,7 @@ from spaceten.errors import (
     WorldLocked,
 )
 from spaceten.kernel.energy import AccountView, Energy, EnergyExhausted
-from spaceten.kernel.event import Event, Observe
+from spaceten.kernel.event import Act, Event, Init, Observe
 from spaceten.kernel.invariant import invariant_issues, spend_from
 from spaceten.kernel.space import (
     Address,
@@ -32,13 +33,12 @@ from spaceten.kernel.space import (
     Workspace,
     WriteTooLarge,
 )
-from spaceten.kernel.world import World
+from spaceten.kernel.world import CheckIssue, CheckReport, World
 from spaceten.store.jsonl import JsonlStore
 from spaceten.store.protocol import WorldHeader
 
 _DEFAULT_ENERGY = 100_000
 _RESERVED = ".spaceten"
-_SKIP_ROOT_CHECK = {None, "init", "version"}
 
 app = typer.Typer(name="spaceten", no_args_is_help=True, add_completion=False)
 
@@ -65,10 +65,14 @@ def _require_world(root: Path) -> None:
         _fail(f"no {_RESERVED}/ under {root}; run spaceten init")
 
 
+def _spent_mj(events: Sequence[Event]) -> int:
+    return sum(s.amount.mj for event in events if (s := spend_from(event)))
+
+
 def _replay_account(events: Sequence[Event], cap: int) -> AccountView:
-    spent = sum(s.amount.mj for event in events if (s := spend_from(event)))
+    spent = _spent_mj(events)
     remaining = cap - spent
-    # Energy forbids negatives; I1 still surfaces via check/World.load.
+    # Energy forbids negatives; check records I1 from the raw remaining.
     if remaining < 0:
         remaining = 0
     return AccountView(Energy(cap), Energy(spent), Energy(remaining))
@@ -139,6 +143,62 @@ def _cli_error(exc: BaseException) -> NoReturn:
     _fail(str(exc))
 
 
+def _dirty_space_issues(root: Path, events: Sequence[Event]) -> list[CheckIssue]:
+    last: dict[str, str] = {}
+    for event in events:
+        op = event.op
+        if isinstance(op, Act):
+            last[op.address] = op.digest
+        elif isinstance(op, Observe) and not op.listing and op.content_hash is not None:
+            last[op.address] = op.content_hash
+    workspace = Workspace(root)
+    issues: list[CheckIssue] = []
+    for address, digest in last.items():
+        try:
+            payload = workspace.read(Address(address))
+        except (CellNotFound, OutsideSpace, IsADirectoryError, OSError):
+            issues.append(CheckIssue("dirty_space", f"{address} missing or unreadable"))
+            continue
+        if hashlib.sha256(payload).hexdigest() != digest:
+            issues.append(CheckIssue("dirty_space", f"{address} hash mismatch"))
+    return issues
+
+
+def _integrity_report(root: Path, *, rebuild: bool) -> CheckReport:
+    """I1–I7 via spend_from. Does not debit (overspend must still report)."""
+    header, events, account, _cells = _snapshot(root)
+    remaining_mj = header.energy_cap - _spent_mj(events)
+    issues: list[CheckIssue] = []
+    if remaining_mj < 0:
+        issues.append(CheckIssue("I1", f"remaining {remaining_mj} mj is negative"))
+    if rebuild:
+        caches = JsonlStore(root, skip_torn=True).load_caches()
+        if caches is not None and caches[0] != account:
+            issues.append(
+                CheckIssue(
+                    "cache_drift",
+                    "energy cache does not match spend_from replay",
+                )
+            )
+        issues.extend(_dirty_space_issues(root, events))
+    if events and isinstance(events[0].op, Init):
+        if events[0].op.energy_cap_mj != header.energy_cap:
+            issues.append(
+                CheckIssue(
+                    "cache_drift",
+                    "header energy_cap does not match Init.energy_cap_mj",
+                )
+            )
+    for code, message in invariant_issues(events, account, in_jail=_in_jail(root)):
+        issues.append(CheckIssue(code, message))
+    return CheckReport(
+        ok=not issues,
+        issues=tuple(issues),
+        events=len(events),
+        remaining=account.remaining,
+    )
+
+
 @app.callback()
 def main(
     ctx: typer.Context,
@@ -161,8 +221,6 @@ def main(
         logger.setLevel(logging.INFO)
     else:
         logger.setLevel(logging.WARNING)
-    if ctx.invoked_subcommand not in _SKIP_ROOT_CHECK:
-        _require_world(resolved)
 
 
 @app.command()
@@ -209,6 +267,7 @@ def status(
 ) -> None:
     """Print id, seq, remaining/spent/cap, and cell count."""
     root = _opts(ctx).root
+    _require_world(root)
     try:
         header, events, account, cells = _snapshot(root)
     except (FileNotFoundError, ValueError, TruncatedLog) as exc:
@@ -233,6 +292,7 @@ def observe(
 ) -> None:
     """Commit a human-authored Observe."""
     root = _opts(ctx).root
+    _require_world(root)
     try:
         world = World.load(root)
         receipt = world.propose("human", _observe_op(root, path))
@@ -263,6 +323,7 @@ def log_cmd(
 ) -> None:
     """Tail events (lock-free)."""
     root = _opts(ctx).root
+    _require_world(root)
     try:
         _header, events, _account, _cells = _snapshot(root)
     except (FileNotFoundError, ValueError, TruncatedLog) as exc:
@@ -277,6 +338,7 @@ def log_cmd(
 def ledger(ctx: typer.Context) -> None:
     """Print spends via spend_from and the I2 remaining+spent==cap line."""
     root = _opts(ctx).root
+    _require_world(root)
     try:
         _header, events, account, _cells = _snapshot(root)
     except (FileNotFoundError, ValueError, TruncatedLog) as exc:
@@ -300,9 +362,13 @@ def check(
 ) -> None:
     """Check invariants I1–I7."""
     root = _opts(ctx).root
+    _require_world(root)
     try:
         world = World.load(root, truncate_partial=truncate_partial)
         report = world.check(rebuild=rebuild)
+    except EnergyExhausted:
+        # load debit cannot represent remaining < 0; report I1/I2 from spend_from
+        report = _integrity_report(root, rebuild=rebuild)
     except TruncatedLog as exc:
         _cli_error(exc)
     except (

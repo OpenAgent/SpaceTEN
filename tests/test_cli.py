@@ -1,4 +1,5 @@
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
 
@@ -82,6 +83,17 @@ def test_status_refuses_without_spaceten(tmp_path: Path) -> None:
     result = _root(tmp_path, "status")
     assert result.exit_code != 0
     assert ".spaceten" in result.output
+
+
+def test_subcommand_help_without_spaceten(tmp_path: Path) -> None:
+    status_help = _root(tmp_path, "status", "--help")
+    assert status_help.exit_code == 0, status_help.output
+    assert "--json" in status_help.output
+    check_help = _root(tmp_path, "check", "--help")
+    assert check_help.exit_code == 0, check_help.output
+    assert "--rebuild" in check_help.output
+    assert "--truncate-partial" in check_help.output
+    assert ".spaceten" not in check_help.output
 
 
 def test_check_ok_after_observe(tmp_path: Path) -> None:
@@ -184,3 +196,27 @@ def test_observe_missing_cell(tmp_path: Path) -> None:
     result = _root(tmp_path, "observe", "gone.txt")
     assert result.exit_code != 0
     assert "gone.txt" in result.output
+
+
+def test_check_overspent_reports_invariants(tmp_path: Path) -> None:
+    assert _init(tmp_path, "--energy", "1").exit_code == 0
+    events_path = tmp_path / ".spaceten" / "events.jsonl"
+    genesis = Event.model_validate_json(events_path.read_text().splitlines()[0])
+    extra = Event(
+        id="01ARZ3NDEKTSV4RRFFQ69G5FAV",
+        seq=2,
+        wall=datetime(2026, 8, 16, tzinfo=UTC),
+        parent=genesis.id,
+        actor="human",
+        energy_delta_mj=-100,
+        energy_reason="io",
+        op=Observe(address="IN.txt", size_bytes=0, content_hash=None),
+    )
+    with events_path.open("a", encoding="utf-8") as handle:
+        handle.write(extra.model_dump_json() + "\n")
+    result = _root(tmp_path, "check")
+    assert result.exit_code == 1
+    assert "Traceback" not in result.output
+    assert "I1:" in result.stdout
+    assert "I2:" in result.stdout
+    assert "remaining" in result.stdout
