@@ -1,0 +1,50 @@
+[project]
+name = "spaceten"
+version = "0.1.0"
+description = "Space Time Energy Number — experimental local kernel and CLI"
+readme = "README.md"
+license = "Apache-2.0"
+authors = [{ name = "OpenAgent / Eric Josh Eidem" }]
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2",
+    "typer>=0.12",
+    "ulid-py>=1.1",
+]
+
+[project.optional-dependencies]
+spacexai = ["xai-sdk"]
+
+[project.scripts]
+spaceten = "spaceten.cli.main:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "ruff>=0.8",
+    "pyright>=1.1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/spaceten"]
+
+[tool.ruff]
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.pyright]
+include = ["src", "tests"]
+pythonVersion = "3.12"
+typeCheckingMode = "standard"
+venvPath = "."
+venv = ".venv"
