@@ -18,6 +18,7 @@ from spaceten.cli.render import (
     render_log,
     render_status,
 )
+from spaceten.contest.cli import contest_app
 from spaceten.errors import (
     DirtySpace,
     InvariantError,
@@ -46,6 +47,7 @@ _DEFAULT_ENERGY = 100_000
 _RESERVED = ".spaceten"
 
 app = typer.Typer(name="spaceten", no_args_is_help=True, add_completion=False)
+app.add_typer(contest_app, name="contest")
 
 
 @dataclass

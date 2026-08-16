@@ -10,11 +10,13 @@ src/spaceten/
   store/        Store protocol, MemoryStore, JsonlStore, flock. No network.
   providers/    Provider protocol, NullProvider, SpaceXAIProvider.
   agent/        tools, prompt, observe-plan-act loop.
-  cli/          Typer: init, status, observe, log, ledger, check, plan, run, version.
+  cli/          Typer: init, status, observe, log, ledger, check, plan, run, contest, version.
+  contest/      Sealed fixtures and checker (not imported by kernel or store).
   demo/         Workshop demo wiring.
 tests/          one module per area; jail cases in test_jail.py.
 docs/DESIGN.md  design of record.
 examples/workshop/
+examples/contest/anagrams/
 ```
 
 `spaceten.kernel` and `spaceten.store` must not import `spaceten.providers` or any HTTP client. Only `providers/spacexai.py` knows `api.x.ai`, `XAI_API_KEY`, or model names.
