@@ -365,9 +365,9 @@ def test_cli_run_defaults_to_null(tmp_path: Path) -> None:
         .read_text(encoding="utf-8")
         .splitlines()
     ]
-    plans = [event for event in events if isinstance(event.op, Plan)]
+    plans = [event.op for event in events if isinstance(event.op, Plan)]
     assert plans
-    assert all(event.op.provider == "null" for event in plans)
+    assert all(plan.provider == "null" for plan in plans)
 
 
 def test_cli_plan_does_not_act(tmp_path: Path) -> None:
