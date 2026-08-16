@@ -282,6 +282,26 @@ def test_jail_observe_and_act_write_nothing(tmp_path: Path) -> None:
     assert list(tmp_path.iterdir()) == []
 
 
+def test_propose_act_rejects_directory_dest(tmp_path: Path) -> None:
+    (tmp_path / "subdir").mkdir()
+    world = _world(tmp_path)
+    genesis = world.head
+    spent = world.account.spent
+    parent = tmp_path.resolve().parent
+    before_outside = {p.name for p in parent.iterdir() if p.name.endswith(".part")}
+    with pytest.raises(IsADirectoryError):
+        world.propose("human", _act(".", b"no"), data=b"no")
+    with pytest.raises(IsADirectoryError):
+        world.propose("human", _act("subdir", b"no"), data=b"no")
+    assert world.head == genesis
+    assert world.account.spent == spent
+    assert world.account.conserved()
+    assert not list(tmp_path.glob("**/.*.part"))
+    after_outside = {p.name for p in parent.iterdir() if p.name.endswith(".part")}
+    assert after_outside == before_outside
+    assert (tmp_path / "subdir").is_dir()
+
+
 def test_write_too_large_writes_nothing(tmp_path: Path) -> None:
     world = _world(tmp_path, max_write_bytes=4)
     genesis = world.head
@@ -399,6 +419,21 @@ def test_recover_orphan_part_and_finish_replace(tmp_path: Path) -> None:
     store.recover_writes(store.load_events())
     assert (tmp_path / "OUT.md").read_bytes() == data
     assert not staged.exists()
+
+
+def test_recover_does_not_delete_ulid_part_dest(tmp_path: Path) -> None:
+    store = MemoryStore()
+    world = World.init(tmp_path, energy_cap=20, store=store)
+    name = ".01ARZ3NDEKTSV4RRFFQ69G5FAV.part"
+    data = b"keep-me"
+    world.propose("human", _act(name, data), data=data)
+    dest = tmp_path / name
+    assert dest.read_bytes() == data
+    store.recover_writes(store.load_events())
+    assert dest.read_bytes() == data
+    loaded = World.load(tmp_path, store=store)
+    assert dest.read_bytes() == data
+    assert loaded.check().ok
 
 
 def test_receipt_types(tmp_path: Path) -> None:

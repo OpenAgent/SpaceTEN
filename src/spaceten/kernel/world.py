@@ -401,6 +401,8 @@ class World:
         payload = bytes(data)
         addr = Address(op.address)
         dest = self._workspace.resolve(addr)
+        if dest.exists() and dest.is_dir():
+            raise IsADirectoryError(op.address)
         if len(payload) > self._workspace.max_write_bytes:
             raise WriteTooLarge(f"{len(payload)} > {self._workspace.max_write_bytes}")
         quote = io_cost_mj("write", len(payload))

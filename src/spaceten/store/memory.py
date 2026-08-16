@@ -21,6 +21,13 @@ def _file_sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _resolved(path: Path) -> Path:
+    try:
+        return path.resolve()
+    except OSError:
+        return path
+
+
 class MemoryStore:
     """Events/header/caches in RAM; dest bytes always live on the jailed FS."""
 
@@ -74,20 +81,16 @@ class MemoryStore:
             return
         acts = {event.id: event for event in events if isinstance(event.op, Act)}
         seen: set[Path] = set()
+        act_dests: set[Path] = set()
         for event in acts.values():
             dest = self._act_dest(event)
+            act_dests.add(_resolved(dest))
             staged = dest.parent / f".{event.id}.part"
-            try:
-                seen.add(staged.resolve())
-            except OSError:
-                seen.add(staged)
+            seen.add(_resolved(staged))
             self._recover_act(event, dest, staged)
         for staged in self._iter_part_files():
-            try:
-                resolved = staged.resolve()
-            except OSError:
-                resolved = staged
-            if resolved in seen:
+            resolved = _resolved(staged)
+            if resolved in seen or resolved in act_dests:
                 continue
             event_id = staged.name[1 : -len(".part")]
             matching = acts.get(event_id)
@@ -111,7 +114,9 @@ class MemoryStore:
         digest = op.digest
         dest_hash = _file_sha256(dest) if dest.is_file() else None
         if dest_hash == digest:
-            staged.unlink(missing_ok=True)
+            # dest may itself be named .{ulid}.part; never unlink committed bytes
+            if _resolved(staged) != _resolved(dest):
+                staged.unlink(missing_ok=True)
             return
         if staged.is_file() and _file_sha256(staged) == digest:
             dest.parent.mkdir(parents=True, exist_ok=True)
