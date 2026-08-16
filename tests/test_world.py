@@ -66,13 +66,16 @@ def test_public_exports() -> None:
         "InvariantError",
         "WorldExists",
         "WorldLocked",
+        "Provider",
+        "CompletionRequest",
+        "CompletionResponse",
+        "ProviderError",
     ):
         assert hasattr(spaceten, name)
     assert Address is spaceten.Address
     assert Cell is spaceten.Cell
     assert InvariantError is spaceten.InvariantError
     assert WorldLocked is spaceten.WorldLocked
-    assert not hasattr(spaceten, "Provider")
     assert not hasattr(spaceten, "debit")
 
 

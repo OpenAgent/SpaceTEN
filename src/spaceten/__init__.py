@@ -12,6 +12,12 @@ from spaceten.kernel.space import (
     WriteTooLarge,
 )
 from spaceten.kernel.world import CheckIssue, CheckReport, Receipt, World
+from spaceten.providers.base import (
+    CompletionRequest,
+    CompletionResponse,
+    Provider,
+    ProviderError,
+)
 from spaceten.store.protocol import WorldHeader
 
 __version__ = "0.1.0"
@@ -36,4 +42,8 @@ __all__ = [
     "InvariantError",
     "WorldExists",
     "WorldLocked",
+    "Provider",
+    "CompletionRequest",
+    "CompletionResponse",
+    "ProviderError",
 ]
