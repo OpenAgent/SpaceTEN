@@ -311,9 +311,7 @@ def observe(
         ValueError,
     ) as exc:
         _cli_error(exc)
-    typer.echo(
-        f"{render_event(receipt.event)} remaining={receipt.remaining.mj} mj"
-    )
+    typer.echo(f"{render_event(receipt.event)} remaining={receipt.remaining.mj} mj")
 
 
 @app.command("log")
