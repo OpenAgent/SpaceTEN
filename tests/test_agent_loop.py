@@ -1,4 +1,5 @@
 import ast
+import re
 from pathlib import Path
 
 import pytest
@@ -348,13 +349,25 @@ def test_cli_workshop_null_golden(tmp_path: Path) -> None:
     assert f"remaining {remaining} + spent {spent} == cap {cap}" in led.stdout
 
 
+def _plain(text: str) -> str:
+    return re.sub(r"\x1b\[[0-9;]*m", "", text)
+
+
 def test_cli_run_defaults_to_null(tmp_path: Path) -> None:
     install(tmp_path)
     assert runner.invoke(app, ["init", str(tmp_path)]).exit_code == 0
     ran = runner.invoke(app, ["--root", str(tmp_path), "run", "--goal", GOAL])
     assert ran.exit_code == 0, ran.output
     assert (tmp_path / "OUT.md").is_file()
-    assert "spaceten.providers.spacexai" not in __import__("sys").modules
+    events = [
+        Event.model_validate_json(line)
+        for line in (tmp_path / ".spaceten" / "events.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    plans = [event for event in events if isinstance(event.op, Plan)]
+    assert plans
+    assert all(event.op.provider == "null" for event in plans)
 
 
 def test_cli_plan_does_not_act(tmp_path: Path) -> None:
@@ -375,12 +388,12 @@ def test_cli_plan_does_not_act(tmp_path: Path) -> None:
 def test_cli_plan_and_run_help_without_world(tmp_path: Path) -> None:
     plan_help = runner.invoke(app, ["--root", str(tmp_path), "plan", "--help"])
     assert plan_help.exit_code == 0, plan_help.output
-    assert "--goal" in plan_help.output
+    assert "--goal" in _plain(plan_help.output)
     run_help = runner.invoke(app, ["--root", str(tmp_path), "run", "--help"])
     assert run_help.exit_code == 0, run_help.output
-    assert "--provider" in run_help.output
-    assert "--max-steps" in run_help.output
-    assert ".spaceten" not in run_help.output
+    assert "--provider" in _plain(run_help.output)
+    assert "--max-steps" in _plain(run_help.output)
+    assert ".spaceten" not in _plain(run_help.output)
 
 
 def test_cli_unknown_provider(tmp_path: Path) -> None:
