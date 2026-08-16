@@ -12,3 +12,11 @@ class WorldExists(Exception):
 
 class WorldLocked(Exception):
     """Exclusive flock on .spaceten/lock is held. Fail immediately; do not wait."""
+
+
+class TruncatedLog(Exception):
+    """Last events.jsonl line is torn. Refuse load unless truncate_partial."""
+
+
+class DirtySpace(Exception):
+    """Act dest does not match digest and no staged file can finish the write."""

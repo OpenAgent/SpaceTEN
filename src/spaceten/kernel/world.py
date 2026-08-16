@@ -25,6 +25,7 @@ from spaceten.kernel.space import (
     WriteTooLarge,
 )
 from spaceten.kernel.time import Clock
+from spaceten.store.jsonl import JsonlStore
 from spaceten.store.protocol import Store, WorldHeader
 
 _DEFAULT_ENERGY_CAP = 100_000
@@ -54,11 +55,14 @@ class CheckReport:
     remaining: Energy
 
 
-def _require_store(store: Store | None) -> Store:
+def _default_store(
+    store: Store | None,
+    root: Path,
+    *,
+    truncate_partial: bool = False,
+) -> Store:
     if store is None:
-        raise NotImplementedError(
-            "JsonlStore is not implemented; pass store=MemoryStore()"
-        )
+        return JsonlStore(root, truncate_partial=truncate_partial)
     return store
 
 
@@ -124,8 +128,10 @@ class World:
         root.mkdir(parents=True, exist_ok=True)
         if (root / _RESERVED_DIR).exists():
             raise WorldExists(str(root / _RESERVED_DIR))
-        store = _require_store(store)
         resolved = root.resolve()
+        if store is None:
+            (resolved / _RESERVED_DIR).mkdir()
+        store = _default_store(store, resolved)
         _bind_store_root(store, resolved)
         clock = clock or Clock()
         ids = ids or new_id
@@ -180,9 +186,12 @@ class World:
         clock: Clock | None = None,
         ids: IdFactory | None = None,
         max_write_bytes: int | None = None,
+        truncate_partial: bool = False,
     ) -> "World":
-        store = _require_store(store)
         resolved = Path(root).resolve()
+        store = _default_store(store, resolved, truncate_partial=truncate_partial)
+        if truncate_partial and isinstance(store, JsonlStore):
+            store.truncate_partial = True
         _bind_store_root(store, resolved)
         with store.lock():
             events = store.load_events()

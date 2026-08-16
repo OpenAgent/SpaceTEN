@@ -108,11 +108,14 @@ def test_init_fail_if_spaceten_exists(tmp_path: Path) -> None:
         World.init(tmp_path, store=MemoryStore())
 
 
-def test_store_none_is_not_implemented(tmp_path: Path) -> None:
-    with pytest.raises(NotImplementedError, match="JsonlStore"):
-        World.init(tmp_path)
-    with pytest.raises(NotImplementedError, match="JsonlStore"):
-        World.load(tmp_path)
+def test_store_none_uses_jsonl_store(tmp_path: Path) -> None:
+    world = World.init(tmp_path, energy_cap=50)
+    assert (tmp_path / ".spaceten" / "world.json").is_file()
+    loaded = World.load(tmp_path)
+    assert loaded.header.energy_cap == 50
+    assert loaded.header.id == world.header.id
+    assert loaded.head is not None
+    assert isinstance(loaded.head.op, Init)
 
 
 def test_propose_observe_list_dir_and_file(tmp_path: Path) -> None:
