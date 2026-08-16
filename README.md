@@ -49,4 +49,19 @@ v0 is a local process on a trusted laptop. Whoever can write the workspace can w
 - Prompt injection from files the agent reads is expected. The kernel still enforces jail + energy; it does not solve injection.
 - No shell / subprocess tool. Writes over 1 MiB (default) are refused.
 
+## Contest (anagrams)
+
+A discrete-event competition on the kernel: six names, four hidden source words,
+every inference an Observe or Act, Energy as the score. The checker is not in
+the jail.
+
+```bash
+uv run spaceten contest init ./play --fixture anagrams
+uv run spaceten --root ./play observe NAMES.md
+# commit steps/*.md then SOLUTION.md via spaceten contest step
+uv run spaceten --root ./play contest verify
+```
+
+See [examples/contest/anagrams/README.md](examples/contest/anagrams/README.md).
+
 The design of record is [docs/DESIGN.md](docs/DESIGN.md).
