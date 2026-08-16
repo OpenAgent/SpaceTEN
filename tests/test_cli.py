@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
@@ -85,15 +86,19 @@ def test_status_refuses_without_spaceten(tmp_path: Path) -> None:
     assert ".spaceten" in result.output
 
 
+def _plain(text: str) -> str:
+    return re.sub(r"\x1b\[[0-9;]*m", "", text)
+
+
 def test_subcommand_help_without_spaceten(tmp_path: Path) -> None:
     status_help = _root(tmp_path, "status", "--help")
     assert status_help.exit_code == 0, status_help.output
-    assert "--json" in status_help.output
+    assert "--json" in _plain(status_help.output)
     check_help = _root(tmp_path, "check", "--help")
     assert check_help.exit_code == 0, check_help.output
-    assert "--rebuild" in check_help.output
-    assert "--truncate-partial" in check_help.output
-    assert ".spaceten" not in check_help.output
+    assert "--rebuild" in _plain(check_help.output)
+    assert "--truncate-partial" in _plain(check_help.output)
+    assert ".spaceten" not in _plain(check_help.output)
 
 
 def test_check_ok_after_observe(tmp_path: Path) -> None:
