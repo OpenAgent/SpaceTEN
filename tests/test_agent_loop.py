@@ -1,4 +1,6 @@
 import ast
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -354,7 +356,21 @@ def test_cli_run_defaults_to_null(tmp_path: Path) -> None:
     ran = runner.invoke(app, ["--root", str(tmp_path), "run", "--goal", GOAL])
     assert ran.exit_code == 0, ran.output
     assert (tmp_path / "OUT.md").is_file()
-    assert "spaceten.providers.spacexai" not in __import__("sys").modules
+    # Sibling tests import the adapter at collection; probe a fresh interpreter.
+    probe = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from spaceten.cli.main import _make_provider\n"
+            "import sys\n"
+            "_make_provider('null')\n"
+            "assert 'spaceten.providers.spacexai' not in sys.modules\n",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert probe.returncode == 0, probe.stderr
 
 
 def test_cli_plan_does_not_act(tmp_path: Path) -> None:
