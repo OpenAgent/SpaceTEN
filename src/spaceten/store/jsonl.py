@@ -8,7 +8,7 @@ from spaceten.errors import DirtySpace, TruncatedLog
 from spaceten.kernel.energy import AccountView
 from spaceten.kernel.event import Act, Event
 from spaceten.kernel.number import Id
-from spaceten.kernel.space import Cell
+from spaceten.kernel.space import Address, Cell, OutsideSpace, Workspace
 from spaceten.store.lock import exclusive_lock
 from spaceten.store.paths import StorePaths
 from spaceten.store.protocol import WorldHeader
@@ -72,13 +72,23 @@ class JsonlStore:
             if self.truncate_partial:
                 raise ValueError("truncate_partial refused on a clean events.jsonl")
             return []
-        lines = raw.decode("utf-8").splitlines()
+        # Split only on \n so U+2028/U+2029/NEL inside JSON strings stay intact.
+        chunks = raw.split(b"\n")
+        if chunks and chunks[-1] == b"":
+            chunks = chunks[:-1]
         events: list[Event] = []
         torn = False
-        for index, line in enumerate(lines):
-            if not line.strip():
+        for index, chunk in enumerate(chunks):
+            if not chunk.strip():
                 continue
-            is_last = index == len(lines) - 1
+            is_last = index == len(chunks) - 1
+            try:
+                line = chunk.decode("utf-8")
+            except UnicodeDecodeError as exc:
+                if is_last:
+                    torn = True
+                    break
+                raise ValueError(f"corrupt events.jsonl line {index + 1}") from exc
             try:
                 payload = json.loads(line)
             except json.JSONDecodeError as exc:
@@ -140,15 +150,24 @@ class JsonlStore:
         os.replace(staged, dest)
 
     def recover_writes(self, events: list[Event]) -> None:
+        last_act: dict[str, Event] = {}
+        for event in events:
+            if isinstance(event.op, Act):
+                last_act[event.op.address] = event
         seen: set[Path] = set()
         dirty: list[str] = []
-        for event in events:
+        workspace = Workspace(self.root)
+        for event in last_act.values():
             op = event.op
             if not isinstance(op, Act):
                 continue
-            dest = self.root / op.address
             staged = self.paths.staged(event.id)
             seen.add(_resolved(staged))
+            try:
+                dest = workspace.resolve(Address(op.address))
+            except OutsideSpace:
+                dirty.append(op.address)
+                continue
             if not self._recover_act(event, dest, staged):
                 dirty.append(op.address)
         if self.paths.tmp.exists():

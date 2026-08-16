@@ -212,3 +212,69 @@ def test_dirty_space_after_mutating_dest(tmp_path: Path) -> None:
     with pytest.raises(DirtySpace, match="dest mismatch"):
         World.load(tmp_path)
     assert (tmp_path / "OUT.md").read_bytes() == b"tampered"
+
+
+def test_load_after_overwrite_keeps_last_digest(tmp_path: Path) -> None:
+    world = World.init(tmp_path, energy_cap=40)
+    world.propose("human", _act("OUT.md", b"v1"), data=b"v1")
+    world.propose("human", _act("OUT.md", b"v2"), data=b"v2")
+    dest = tmp_path / "OUT.md"
+    assert dest.read_bytes() == b"v2"
+    loaded = World.load(tmp_path)
+    assert dest.read_bytes() == b"v2"
+    assert loaded.check(rebuild=True).ok
+    assert loaded.head is not None
+    assert isinstance(loaded.head.op, Act)
+    assert loaded.head.op.digest == _sha(b"v2")
+
+
+def test_recover_follows_in_jail_symlink(tmp_path: Path) -> None:
+    world = World.init(tmp_path, energy_cap=20)
+    real = tmp_path / "real.txt"
+    real.write_bytes(b"old")
+    alias = tmp_path / "alias"
+    alias.symlink_to("real.txt")
+    store = JsonlStore(tmp_path)
+    data = b"recovered-via-alias"
+    event = Event(
+        id="01ARZ3NDEKTSV4RRFFQ69G5FAW",
+        seq=2,
+        wall=datetime(2026, 8, 15, 17, 0, 0, tzinfo=UTC),
+        parent=world.head.id if world.head else None,
+        actor="human",
+        energy_delta_mj=-2,
+        energy_reason="io",
+        op=_act("alias", data),
+    )
+    staged = store.stage_write(Id(event.id), alias, data)
+    store.append(event)
+    assert real.read_bytes() != data
+    assert alias.is_symlink()
+    store.recover_writes(store.load_events())
+    assert alias.is_symlink()
+    assert alias.readlink() == Path("real.txt")
+    assert real.read_bytes() == data
+    assert not staged.exists()
+
+
+def test_torn_incomplete_utf8_tail(tmp_path: Path) -> None:
+    World.init(tmp_path, energy_cap=20)
+    events_path = tmp_path / ".spaceten" / "events.jsonl"
+    events_path.write_bytes(events_path.read_bytes() + b'{"schema":1,"id":"' + b"\xc3")
+    with pytest.raises(TruncatedLog, match="torn last line"):
+        World.load(tmp_path)
+    skipped = JsonlStore(tmp_path, skip_torn=True).load_events()
+    assert len(skipped) == 1
+    loaded = World.load(tmp_path, truncate_partial=True)
+    assert loaded.head is not None
+    assert loaded.head.seq == 1
+
+
+def test_load_event_with_unicode_line_separators(tmp_path: Path) -> None:
+    world = World.init(tmp_path, energy_cap=20)
+    summary = "hello\u2028world\u2029nel\u0085end"
+    world.propose("human", Finish(summary=summary))
+    loaded = World.load(tmp_path)
+    assert loaded.head is not None
+    assert isinstance(loaded.head.op, Finish)
+    assert loaded.head.op.summary == summary
