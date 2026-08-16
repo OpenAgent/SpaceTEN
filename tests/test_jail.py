@@ -35,6 +35,10 @@ def _workspace(tmp_path: Path) -> tuple[Path, Workspace]:
         ".spaceten/tmp/x",
         "./.spaceten",
         "./.spaceten/config.toml",
+        ".SPACETEN",
+        ".SpaceTen",
+        ".SPACETEN/events.jsonl",
+        "./.SPACETEN/events.jsonl",
     ],
 )
 def test_illegal_address_rejected(path: str) -> None:
@@ -118,7 +122,9 @@ def test_symlink_staying_inside_is_allowed(tmp_path: Path) -> None:
     root, ws = _workspace(tmp_path)
     (root / "real.txt").write_bytes(b"hello")
     (root / "alias").symlink_to(root / "real.txt")
+    (root / "rel").symlink_to("real.txt")
     assert ws.read(Address("alias")) == b"hello"
+    assert ws.read(Address("rel")) == b"hello"
     cell = ws.observe(Address("alias"))
     assert cell.kind == "file"
     assert cell.size_bytes == 5
@@ -208,3 +214,82 @@ def test_missing_path_is_not_outside_space(tmp_path: Path) -> None:
         ws.read(Address("absent.txt"))
     with pytest.raises(CellNotFound):
         ws.list_dir(Address("absent"))
+
+
+def test_symlink_to_spaceten_is_outside(tmp_path: Path) -> None:
+    root, ws = _workspace(tmp_path)
+    kernel = root / ".spaceten"
+    kernel.mkdir()
+    (kernel / "events.jsonl").write_bytes(b"log")
+    (root / "sneaky").symlink_to(".spaceten")
+
+    with pytest.raises(OutsideSpace):
+        ws.resolve(Address("sneaky"))
+    with pytest.raises(OutsideSpace):
+        ws.read(Address("sneaky/events.jsonl"))
+    with pytest.raises(OutsideSpace):
+        ws.observe(Address("sneaky/events.jsonl"))
+    with pytest.raises(OutsideSpace):
+        ws.list_dir(Address("sneaky"))
+    with pytest.raises(OutsideSpace):
+        ws.write(Address("sneaky/pwned.txt"), b"tamper")
+
+    assert (kernel / "events.jsonl").read_bytes() == b"log"
+    assert not (kernel / "pwned.txt").exists()
+    assert "sneaky" not in [cell.address.path for cell in ws.list_dir(Address("."))]
+
+
+def test_spaceten_case_variants_do_not_touch_kernel(tmp_path: Path) -> None:
+    root, _ws = _workspace(tmp_path)
+    kernel = root / ".spaceten"
+    kernel.mkdir()
+    (kernel / "events.jsonl").write_bytes(b"log")
+    before = sorted(p.name for p in kernel.iterdir())
+
+    for path in (
+        ".SPACETEN",
+        ".SpaceTen",
+        ".SPACETEN/hack.txt",
+        ".SpaceTen/hack.txt",
+        "./.SPACETEN/events.jsonl",
+    ):
+        with pytest.raises(OutsideSpace):
+            Address(path)
+
+    assert (kernel / "events.jsonl").read_bytes() == b"log"
+    assert sorted(p.name for p in kernel.iterdir()) == before
+    assert not (kernel / "hack.txt").exists()
+
+
+def test_in_jail_symlink_via_unresolved_root_prefix(tmp_path: Path) -> None:
+    real = tmp_path / "real"
+    real.mkdir()
+    (real / "real.txt").write_bytes(b"hello")
+    (real / "rel").symlink_to("real.txt")
+    prefix = tmp_path / "via"
+    prefix.symlink_to(real)
+    (real / "abs").symlink_to(prefix / "real.txt")
+    ws = Workspace(prefix)
+    assert ws.read(Address("real.txt")) == b"hello"
+    assert ws.read(Address("rel")) == b"hello"
+    assert ws.read(Address("abs")) == b"hello"
+
+
+def test_workspace_via_var_symlink_prefix(tmp_path: Path) -> None:
+    resolved = tmp_path.resolve()
+    private_var = Path("/private/var")
+    if not Path("/var").is_symlink() or private_var.resolve() not in (
+        resolved,
+        *resolved.parents,
+    ):
+        pytest.skip("/var is not a symlink prefix of tmp_path")
+    via = Path("/var") / resolved.relative_to(private_var.resolve())
+    root = via / "space"
+    root.mkdir()
+    (root / "real.txt").write_bytes(b"hello")
+    (root / "rel").symlink_to("real.txt")
+    (root / "abs").symlink_to(root / "real.txt")
+    ws = Workspace(root)
+    assert ws.read(Address("real.txt")) == b"hello"
+    assert ws.read(Address("rel")) == b"hello"
+    assert ws.read(Address("abs")) == b"hello"

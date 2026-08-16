@@ -30,6 +30,9 @@ def _raw_parts(path: str) -> list[str]:
     return path.split("/")
 
 
+_RESERVED_DIR = ".spaceten"
+
+
 def _reject_illegal_address(path: str) -> None:
     if path == ".":
         return
@@ -40,7 +43,7 @@ def _reject_illegal_address(path: str) -> None:
     if any(part == ".." for part in raw):
         raise OutsideSpace(path)
     parts = tuple(part for part in raw if part and part != ".")
-    if parts and parts[0] == ".spaceten":
+    if parts and parts[0].casefold() == _RESERVED_DIR:
         raise OutsideSpace(path)
 
 
@@ -49,6 +52,29 @@ def _symlink_first_hop(link: Path) -> Path:
     if not target.is_absolute():
         target = link.parent / target
     return Path(os.path.normpath(target))
+
+
+def _canonicalize_hop(hop: Path) -> Path:
+    # realpath the parent so /tmp matches /private/tmp; do not follow hop.name
+    # or hop-outside-and-back would look in-jail.
+    return Path(os.path.realpath(hop.parent)) / hop.name
+
+
+def _is_kernel_owned(joined: Path, root: Path) -> bool:
+    reserved = (root / _RESERVED_DIR).resolve()
+    folded_joined = os.path.normcase(str(joined)).casefold()
+    folded_reserved = os.path.normcase(str(reserved)).casefold()
+    if folded_joined == folded_reserved or folded_joined.startswith(
+        folded_reserved + os.sep
+    ):
+        return True
+    for candidate in (joined, *joined.parents):
+        try:
+            if os.path.samefile(candidate, reserved):
+                return True
+        except OSError:
+            continue
+    return False
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,7 +101,7 @@ class Cell:
 
 class Workspace:
     def __init__(self, root: Path, *, max_write_bytes: int = 1_048_576) -> None:
-        self._root = root
+        self._root = root.resolve()
         self._max_write_bytes = max_write_bytes
 
     @property
@@ -84,12 +110,14 @@ class Workspace:
 
     def resolve(self, address: Address) -> Path:
         _reject_illegal_address(address.path)
-        root = self._root.resolve()
+        root = self._root
         if address.path == ".":
             joined = root
         else:
-            joined = (self._root / address.path).resolve()
+            joined = (root / address.path).resolve()
         if joined != root and root not in joined.parents:
+            raise OutsideSpace(address.path)
+        if _is_kernel_owned(joined, root):
             raise OutsideSpace(address.path)
         self._reject_symlink_escape(address, root)
         return joined
@@ -137,13 +165,13 @@ class Workspace:
         return self._to_cell(address, path)
 
     def _reject_symlink_escape(self, address: Address, root: Path) -> None:
-        cursor = Path(self._root)
+        cursor = root
         for part in _raw_parts(address.path):
             if part in ("", "."):
                 continue
             cursor = cursor / part
             if cursor.is_symlink():
-                hop = _symlink_first_hop(cursor)
+                hop = _canonicalize_hop(_symlink_first_hop(cursor))
                 if hop != root and root not in hop.parents:
                     raise OutsideSpace(address.path)
 
