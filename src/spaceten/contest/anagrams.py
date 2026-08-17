@@ -7,32 +7,36 @@ TERMS = frozenset({"ENERGY", "NUMBER", "SPACE", "TIME"})
 
 # Display names, shuffled so pair-order is not the list order.
 NAMES: tuple[str, ...] = (
-    "Ruben Timme",
-    "Percy Geanes",
-    "Remy Bergunen",
-    "Pam Eisect",
+    "Ben Mutimer",
+    "Spence Geary",
+    "Emy Runenberg",
+    "Pete Micas",
     "Reuben Camps",
-    "Regine Tyme",
+    "Meg Tierney",
 )
 
 PAIRS: dict[str, frozenset[str]] = {
-    "pam eisect": frozenset({"SPACE", "TIME"}),
-    "percy geanes": frozenset({"SPACE", "ENERGY"}),
+    "pete micas": frozenset({"SPACE", "TIME"}),
+    "spence geary": frozenset({"SPACE", "ENERGY"}),
     "reuben camps": frozenset({"SPACE", "NUMBER"}),
-    "regine tyme": frozenset({"TIME", "ENERGY"}),
-    "ruben timme": frozenset({"TIME", "NUMBER"}),
-    "remy bergunen": frozenset({"ENERGY", "NUMBER"}),
+    "meg tierney": frozenset({"TIME", "ENERGY"}),
+    "ben mutimer": frozenset({"TIME", "NUMBER"}),
+    "emy runenberg": frozenset({"ENERGY", "NUMBER"}),
 }
 
 DEFAULT_ENERGY = 10_000
 
-NAMES_MD = "\n".join(NAMES) + "\n"
+PROMPT = "These six names belong together. Why?"
+
+NAMES_MD = PROMPT + "\n\n" + "\n".join(NAMES) + "\n"
 
 RULES_MD = """# Contest rules
 
-You have six names. Each name is an anagram of **two** hidden source words
-combined (all letters, no extras). There are **four** source words in total.
-The six names are the six unique pairings of those words.
+NAMES.md asks why the six names belong together.
+
+Each name is an anagram of **two** hidden source words combined (all
+letters, no extras). There are **four** source words in total. The six
+names are the six unique pairings of those words.
 
 Work only through SpaceTEN. Editor-only edits that are not committed as Acts
 will fail `check --rebuild`.

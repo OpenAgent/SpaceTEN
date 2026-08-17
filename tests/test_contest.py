@@ -59,14 +59,14 @@ def test_sample_pack_verifies(tmp_path: Path) -> None:
 
 
 def test_parse_inventory_and_extract() -> None:
-    inv = parse_step("kind: inventory\nname: Pam Eisect\nletters: A,C,E,E,I,M,P,S,T\n")
+    inv = parse_step("kind: inventory\nname: Pete Micas\nletters: A,C,E,E,I,M,P,S,T\n")
     assert inv.kind == "inventory"
     ext = parse_step(
-        "kind: extract\nword: TIME\nfrom:\n  - Pam Eisect\n  - Regine Tyme\n"
+        "kind: extract\nword: TIME\nfrom:\n  - Pete Micas\n  - Meg Tierney\n"
     )
     assert ext.kind == "extract"
     assert ext.word == "TIME"
-    assert ext.evidence == ("Pam Eisect", "Regine Tyme")
+    assert ext.evidence == ("Pete Micas", "Meg Tierney")
 
 
 def _play(tmp_path: Path) -> World:
@@ -77,31 +77,31 @@ def _play(tmp_path: Path) -> World:
     _write(
         world,
         "steps/01.md",
-        "kind: inventory\nname: Pam Eisect\nletters: A,C,E,E,I,M,P,S,T\n",
+        "kind: inventory\nname: Pete Micas\nletters: A,C,E,E,I,M,P,S,T\n",
     )
     _write(
         world,
         "steps/02.md",
         "kind: extract\nword: TIME\nfrom:\n"
-        "  - Pam Eisect\n  - Regine Tyme\n  - Ruben Timme\n",
+        "  - Pete Micas\n  - Meg Tierney\n  - Ben Mutimer\n",
     )
     _write(
         world,
         "steps/03.md",
         "kind: extract\nword: SPACE\nfrom:\n"
-        "  - Pam Eisect\n  - Percy Geanes\n  - Reuben Camps\n",
+        "  - Pete Micas\n  - Spence Geary\n  - Reuben Camps\n",
     )
     _write(
         world,
         "steps/04.md",
         "kind: extract\nword: ENERGY\nfrom:\n"
-        "  - Percy Geanes\n  - Regine Tyme\n  - Remy Bergunen\n",
+        "  - Spence Geary\n  - Meg Tierney\n  - Emy Runenberg\n",
     )
     _write(
         world,
         "steps/05.md",
         "kind: extract\nword: NUMBER\nfrom:\n"
-        "  - Reuben Camps\n  - Ruben Timme\n  - Remy Bergunen\n",
+        "  - Reuben Camps\n  - Ben Mutimer\n  - Emy Runenberg\n",
     )
     for i, (name, words) in enumerate(PAIRS.items(), start=6):
         display = next(n for n in NAMES if n.casefold() == name)
@@ -154,22 +154,22 @@ def test_wrong_pair_rejected(tmp_path: Path) -> None:
     _write(
         world,
         "steps/01.md",
-        "kind: inventory\nname: Pam Eisect\nletters: A,C,E,E,I,M,P,S,T\n",
+        "kind: inventory\nname: Pete Micas\nletters: A,C,E,E,I,M,P,S,T\n",
     )
     _write(
         world,
         "steps/02.md",
-        "kind: extract\nword: TIME\nfrom:\n  - Pam Eisect\n",
+        "kind: extract\nword: TIME\nfrom:\n  - Pete Micas\n",
     )
     _write(
         world,
         "steps/03.md",
-        "kind: extract\nword: SPACE\nfrom:\n  - Pam Eisect\n",
+        "kind: extract\nword: SPACE\nfrom:\n  - Pete Micas\n",
     )
     _write(
         world,
         "steps/04.md",
-        "kind: pair\nname: Ruben Timme\nwords: [SPACE, TIME]\n",
+        "kind: pair\nname: Ben Mutimer\nwords: [SPACE, TIME]\n",
     )
     report = verify_root(tmp_path)
     assert not report.ok

@@ -1,8 +1,10 @@
 # Contest rules
 
-You have six names. Each name is an anagram of **two** hidden source words
-combined (all letters, no extras). There are **four** source words in total.
-The six names are the six unique pairings of those words.
+NAMES.md asks why the six names belong together.
+
+Each name is an anagram of **two** hidden source words combined (all
+letters, no extras). There are **four** source words in total. The six
+names are the six unique pairings of those words.
 
 Work only through SpaceTEN. Editor-only edits that are not committed as Acts
 will fail `check --rebuild`.
