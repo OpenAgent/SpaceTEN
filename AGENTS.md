@@ -2,6 +2,13 @@
 
 Contributor map. SpaceTEN in prose, `spaceten` in code, STEN only as an abbreviation.
 
+Start here after a new session: [docs/STATUS.md](docs/STATUS.md) (what shipped, decisions, pitfalls). Design of record: [docs/DESIGN.md](docs/DESIGN.md).
+
+- Merge work to `main`, not into leftover feature/stack parent branches.
+- Kernel and store must not import `providers` or HTTP.
+- Contest answers in `src/spaceten/contest/anagrams.py` are public; the jail does not get a copy.
+- CLI help tests: strip ANSI. Pyright: bind `event.op` after `isinstance`.
+
 ## Layout
 
 ```
