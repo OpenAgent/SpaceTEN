@@ -17,4 +17,6 @@ htmlcov/
 .tox/
 .nox/
 .spaceten/
+play/
+play-sample/
 .DS_Store
