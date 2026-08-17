@@ -1,18 +1,5 @@
 # SpaceTEN status (2026-08-16)
 
-Handoff for a **new** Grok session. Start Grok from this repo:
-
-```bash
-cd /Users/eric.eidem/SpaceTEN
-grok
-```
-
-Then: *read `docs/STATUS.md` and `AGENTS.md`; we are modifying SpaceTEN.*
-
-Do not start Grok from `$HOME`. That session will not auto-load this file.
-
-## What exists on `main`
-
 Public repo: https://github.com/OpenAgent/SpaceTEN  
 Tip after contest + sample pack + leaderboard: look at `git log -1` (expected lineage includes merges #11–#16).
 
@@ -25,7 +12,7 @@ Tip after contest + sample pack + leaderboard: look at `git log -1` (expected li
 | Contest | Anagrams of unique pairs of SPACE/TIME/ENERGY/NUMBER |
 | Leaderboard | `spaceten contest leaderboard`; checked-in `examples/contest/anagrams/LEADERBOARD.md` |
 
-Design of record: `docs/DESIGN.md` (Accepted 2026-08-15). It still describes the *plan*; the repo is no longer README-only.
+Design of record: `docs/DESIGN.md` (Accepted 2026-08-15). 
 
 ## Contest (public demo)
 
@@ -53,18 +40,6 @@ Design of record: `docs/DESIGN.md` (Accepted 2026-08-15). It still describes the
 - Pyright does not narrow `event.op` after `isinstance` in a comprehension; bind `event.op` to a name
 - `ruff format --check` is in CI; keep `typer.echo(...)` on one line when it fits
 - `.spaceten/` is gitignored; submit artifacts are `*.sten.tgz`
-
-## How to resume *this* conversation
-
-The long design/implement chat lived in a Grok session whose cwd was the home directory, not this repo.
-
-- In that same TUI: `/rename SpaceTEN v0 kernel + contest` then later `/resume`
-- Or `grok --resume` from the **same cwd** the session used
-- `/session-info` copies the session ID (`c` on the ID)
-
-Transcripts live under `~/.grok/sessions/`. They are bulky and will compact. Prefer this file + `AGENTS.md` + `docs/DESIGN.md` for *modifying the code*.
-
-Optional Grok memory (off by default): enable `[memory] enabled = true`, then `/flush` and `/remember` key facts. Still commit durable rules here.
 
 ## Sensible next work
 
