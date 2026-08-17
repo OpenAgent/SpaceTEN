@@ -28,7 +28,7 @@ DEFAULT_ENERGY = 10_000
 
 PROMPT = "These six names belong together. Why?"
 
-NAMES_MD = PROMPT + "\n\n" + "\n".join(NAMES) + "\n"
+NAMES_MD = PROMPT + "\n\n" + "\n\n".join(NAMES) + "\n"
 
 RULES_MD = """# Contest rules
 
